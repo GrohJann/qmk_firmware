@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "zima.h"
+#include "quantum.h"
 #include <stdio.h>
 
 #ifdef HAPTIC_ENABLE
@@ -21,8 +21,7 @@
 extern haptic_config_t haptic_config;
 #endif
 
-
-#ifdef OLED_DRIVER_ENABLE
+#ifdef OLED_ENABLE
 static bool is_asleep = false;
 static uint32_t oled_timer;
 
@@ -36,25 +35,20 @@ void suspend_wakeup_init_kb(void) {
     suspend_wakeup_init_user();
 }
 
-__attribute__((weak)) oled_rotation_t oled_init_user(oled_rotation_t rotation) { return OLED_ROTATION_180; }
-
-__attribute__((weak)) void render_logo(void) {
-    // clang-format off
-    static const char PROGMEM qmk_logo[] = {
-        0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,0x90,0x91,0x92,0x93,0x94,
-        0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0xaa,0xab,0xac,0xad,0xae,0xaf,0xb0,0xb1,0xb2,0xb3,0xb4,
-        0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0xcb,0xcc,0xcd,0xce,0xcf,0xd0,0xd1,0xd2,0xd3,0xd4,0};
-    // clang-format on
-    oled_write_ln_P(qmk_logo, false);
+oled_rotation_t oled_init_kb(oled_rotation_t rotation) {
+    return OLED_ROTATION_180;
 }
 
-__attribute__((weak)) void oled_task_user(void) {
+bool oled_task_kb(void) {
+    if (!oled_task_user()) {
+        return false;
+    }
     if (is_asleep) {
         oled_off();
-        return;
+        return false;
     }
 
-    if (timer_elapsed32(oled_timer) < 300000) {
+    if (timer_elapsed32(oled_timer) < 30000) {
         oled_on();
         oled_scroll_off();
         oled_write_P(PSTR("SplitKB's Zima"), false);
@@ -71,26 +65,32 @@ __attribute__((weak)) void oled_task_user(void) {
         } else {
             oled_write_ln_P(PSTR("RGB LIGHT DISABLED"), false);
         }
-	#ifdef AUDIO_ENABLE
+#    ifdef AUDIO_ENABLE
         oled_write_P(PSTR("Audio:"), false);
         is_audio_on() ? oled_write_P(PSTR(" on"), false) : oled_write_P(PSTR("off"), false);
-		#ifdef AUDIO_CLICKY
+#        ifdef AUDIO_CLICKY
         oled_write_P(PSTR(" Clicky:"), false);
         (is_clicky_on() && is_audio_on()) ? oled_write_P(PSTR(" on"), false) : oled_write_P(PSTR("off"), false);
-		#endif
-	#else
-		oled_write_ln_P(PSTR(""), false);
-	#endif
+#        endif
+#    endif
     } else {
-        if (timer_elapsed32(oled_timer) < 1200000) {
+        if (timer_elapsed32(oled_timer) < 120000) {
             oled_on();
-            render_logo();
-            oled_scroll_left();
+            // clang-format off
+            static const char PROGMEM qmk_logo[] = {
+                0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,0x90,0x91,0x92,0x93,0x94,
+                0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0xaa,0xab,0xac,0xad,0xae,0xaf,0xb0,0xb1,0xb2,0xb3,0xb4,
+                0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0xcb,0xcc,0xcd,0xce,0xcf,0xd0,0xd1,0xd2,0xd3,0xd4,0};
+            // clang-format on
+            oled_write_ln_P(qmk_logo, false);
+            oled_scroll_right();
         } else {
             oled_off();
         }
     }
+    return false;
 }
+
 bool process_record_kb(uint16_t keycode, keyrecord_t* record) {
     oled_timer = timer_read32();
 
@@ -100,7 +100,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t* record) {
 
 #ifdef ENCODER_ENABLE
 bool encoder_update_kb(uint8_t index, bool clockwise) {
-#    ifdef OLED_DRIVER_ENABLE
+#    ifdef OLED_ENABLE
     oled_timer = timer_read32();
 #    endif
 #    if defined(AUDIO_ENABLE) && defined(AUDIO_CLICKY)
